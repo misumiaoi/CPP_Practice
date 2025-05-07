@@ -3,17 +3,21 @@
 #include <algorithm> // For std::swap
 #include <string>
 #include <stdexcept>
+#include <chrono>
 
 // 声明使用 std 命名空间
 using namespace std;
 
-// 定义 SortingMachine 类（与之前相同）
-template<typename T>
+// 定义 SortingMachine 类的前向声明
+
+template <typename T>
+
 class SortingMachine {
 public:
     enum SortType {
         BUBBLE_SORT = 1,
         INSERTION_SORT = 2,
+        SELECTION_SORT = 3,
         DEFAULT_SORT = BUBBLE_SORT
     };
 
@@ -48,6 +52,11 @@ public:
             currentSortMethod = &SortingMachine<T>::insertionSortImpl;
             // cout << "Sorting method set to Insertion Sort." << endl; // 这里的输出可以移到演示函数中
             break;
+		case SELECTION_SORT:
+			currentSortMethod = &SortingMachine<T>::selectionSortImpl; // 选择排序的实现可以在这里添加
+			cerr << "Warning: Selection Sort is not implemented yet." << endl;
+			currentSortMethod = &SortingMachine<T>::bubbleSortImpl; // 默认使用冒泡排序
+			break;
         default:
             cerr << "Warning: Unknown sorting type (" << type << "). Defaulting to Bubble Sort." << endl;
             currentSortMethod = &SortingMachine<T>::bubbleSortImpl;
@@ -94,6 +103,19 @@ private:
             data[j + 1] = key;
         }
     }
+
+	void selectionSortImpl(vector<T>& data) {
+		size_t n = data.size();
+		for (size_t i = 0; i < n - 1; ++i) {
+			size_t minIndex = i;
+			for (size_t j = i + 1; j < n; ++j) {
+				if (data[j] < data[minIndex]) {
+					minIndex = j;
+				}
+			}
+			swap(data[i], data[minIndex]);
+		}
+	}
 };
 
 // 辅助函数：打印 vector
@@ -138,6 +160,7 @@ int main() {
     demonstrateSorting(numbers1, SortingMachine<int>::BUBBLE_SORT, "Bubble Sort Demonstration (int)");
     demonstrateSorting(numbers2, SortingMachine<int>::INSERTION_SORT, "Insertion Sort Demonstration (int)");
     demonstrateSorting(numbers3, SortingMachine<double>::INSERTION_SORT, "Insertion Sort Demonstration (double)"); // 演示对 double 类型排序
+	demonstrateSorting(numbers1, SortingMachine<int>::SELECTION_SORT, "Selection Sort Demonstration (int)"); // 演示对 int 类型的选择排序
 
     // 注意：每次调用 demonstrateSorting 都会创建一个新的 SortingMachine 对象，
     // 所以每次的 sort count 都是从 0 开始计算的（只计算在该演示函数中调用 sort 的次数）。
@@ -145,23 +168,42 @@ int main() {
 
     cout << "--- Demonstrating cumulative sort count ---" << endl;
     vector<int> numbers_cumulative = { 100, 50, 75, 25 };
-    SortingMachine<int> cumulativeSorter(SortingMachine<int>::BUBBLE_SORT); // 创建一个对象用于多次排序
 
+	auto start_time = chrono::steady_clock::now(); // 记录开始时间
+    SortingMachine<int> cumulativeSorter(SortingMachine<int>::BUBBLE_SORT); // 创建一个对象用于多次排序
+	auto duration_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count(); // 计算时间差
     cout << "Original vector for cumulative sort: ";
     printVector(numbers_cumulative);
     cumulativeSorter.sort(numbers_cumulative);
     cout << "Sorted vector: ";
     printVector(numbers_cumulative);
     cout << "Cumulative sort count: " << cumulativeSorter.getSortCount() << endl;
+	cout << "Time taken for sorting: " << duration_ms << " ms" << endl; // 输出时间差
 
     vector<int> another_vector = { 1, 2, 3, 4, 5 };
     cout << "\nOriginal vector for cumulative sort (second call): ";
     printVector(another_vector);
+	start_time = chrono::steady_clock::now(); // 记录开始时间
     cumulativeSorter.setSortingType(SortingMachine<int>::INSERTION_SORT); // 改变排序方法
     cumulativeSorter.sort(another_vector);
+	duration_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count(); // 计算时间差
     cout << "Sorted vector: ";
     printVector(another_vector);
     cout << "Cumulative sort count (after second call): " << cumulativeSorter.getSortCount() << endl; // 累加的次数
+	cout << "Time taken for sorting: " << duration_ms << " ms" << endl; // 输出时间差
+
+    vector<int> still_another_vector = {520, 330, 327, 545, 258};
+	cout << "\nOriginal vector for cumulative sort (third call): ";
+	printVector(still_another_vector);
+	start_time = chrono::steady_clock::now(); // 记录开始时间
+	cumulativeSorter.setSortingType(SortingMachine<int>::SELECTION_SORT); // 改变排序方法
+	cumulativeSorter.sort(still_another_vector);
+	duration_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count(); // 计算时间差
+	cout << "Sorted vector: ";
+	printVector(still_another_vector);
+	cout << "Cumulative sort count (after third call): " << cumulativeSorter.getSortCount() << endl; // 累加的次数
+	cout << "Time taken for sorting: " << duration_ms << " ms" << endl; // 输出时间差
+
 
     return 0;
 }
