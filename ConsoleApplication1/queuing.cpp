@@ -1,23 +1,24 @@
 #include <vector>
 #include <iostream>
-#include <algorithm> // For std::swap
+#include <algorithm>
 #include <string>
-#include <stdexcept>
-#include <chrono>
+#include <chrono>   // For timing and random seed
+#include <random>   // For random number generation
+#include <type_traits> // For std::is_integral and std::is_floating_point
 
-// 声明使用 std 命名空间
+// 使用 std 命名空间 以保持简洁，但在实际项目中请谨慎使用
 using namespace std;
 
-// 定义 SortingMachine 类的前向声明
+// 假设 SortingMachine 类和 printVector 函数与之前定义的一样
+// ... (SortingMachine 类定义， printVector 函数定义) ...
+// 为了完整性，这里简化列出 SortingMachine 的相关部分
 
-template <typename T>
-
+template<typename T>
 class SortingMachine {
 public:
     enum SortType {
         BUBBLE_SORT = 1,
         INSERTION_SORT = 2,
-        SELECTION_SORT = 3,
         DEFAULT_SORT = BUBBLE_SORT
     };
 
@@ -27,36 +28,24 @@ public:
 
     void sort(vector<T>& data) {
         if (currentSortMethod != nullptr) {
-            string method_name = getMethodName(); // 获取方法名以便输出
-            cout << "Sorting using " << method_name << "..." << endl;
-            (this->*currentSortMethod)(data);
+            string method_name = getMethodName();
+            // cout << "Sorting list using " << method_name << "..." << endl; // 演示函数会打印
+            (this->*currentSortMethod)(data); // 调用选定的排序方法
             sortCount++;
-            // cout << "Sorting complete. Total sort count for this machine: " << sortCount << endl; // 这里的输出可以移到演示函数中更集中
+            // cout << "Sorting complete." << endl; // 演示函数会打印
         }
         else {
             cerr << "Error: No sorting method is selected!" << endl;
         }
     }
-
     int getSortCount() const {
         return sortCount;
     }
 
     void setSortingType(SortType type) {
         switch (type) {
-        case BUBBLE_SORT:
-            currentSortMethod = &SortingMachine<T>::bubbleSortImpl;
-            // cout << "Sorting method set to Bubble Sort." << endl; // 这里的输出可以移到演示函数中
-            break;
-        case INSERTION_SORT:
-            currentSortMethod = &SortingMachine<T>::insertionSortImpl;
-            // cout << "Sorting method set to Insertion Sort." << endl; // 这里的输出可以移到演示函数中
-            break;
-		case SELECTION_SORT:
-			currentSortMethod = &SortingMachine<T>::selectionSortImpl; // 选择排序的实现可以在这里添加
-			cerr << "Warning: Selection Sort is not implemented yet." << endl;
-			currentSortMethod = &SortingMachine<T>::bubbleSortImpl; // 默认使用冒泡排序
-			break;
+        case BUBBLE_SORT: currentSortMethod = &SortingMachine<T>::bubbleSortImpl; break;
+        case INSERTION_SORT: currentSortMethod = &SortingMachine<T>::insertionSortImpl; break;
         default:
             cerr << "Warning: Unknown sorting type (" << type << "). Defaulting to Bubble Sort." << endl;
             currentSortMethod = &SortingMachine<T>::bubbleSortImpl;
@@ -66,26 +55,28 @@ public:
 
 private:
     using SortingMethodPtr = void (SortingMachine<T>::*)(vector<T>&);
-
     SortingMethodPtr currentSortMethod;
     int sortCount;
 
     string getMethodName() const {
-        if (currentSortMethod == &SortingMachine<T>::bubbleSortImpl) {
-            return "Bubble Sort";
-        }
-        else if (currentSortMethod == &SortingMachine<T>::insertionSortImpl) {
-            return "Insertion Sort";
-        }
+        if (currentSortMethod == &SortingMachine<T>::bubbleSortImpl) return "Bubble Sort";
+        if (currentSortMethod == &SortingMachine<T>::insertionSortImpl) return "Insertion Sort";
         return "Unknown Sort Method";
     }
 
     void bubbleSortImpl(vector<T>& data) {
         size_t n = data.size();
+        // --- 添加对向量大小的检查 ---
+        if (n < 2) {
+            return; // 如果元素少于 2 个，无需排序，直接返回
+        }
+        // --------------------------
+
         for (size_t i = 0; i < n - 1; ++i) {
+            // 内层循环的边界 n - i - 1 在 n >= 2 时是正确的
             for (size_t j = 0; j < n - i - 1; ++j) {
                 if (data[j] > data[j + 1]) {
-                    swap(data[j], data[j + 1]);
+                    std::swap(data[j], data[j + 1]);
                 }
             }
         }
@@ -103,22 +94,8 @@ private:
             data[j + 1] = key;
         }
     }
-
-	void selectionSortImpl(vector<T>& data) {
-		size_t n = data.size();
-		for (size_t i = 0; i < n - 1; ++i) {
-			size_t minIndex = i;
-			for (size_t j = i + 1; j < n; ++j) {
-				if (data[j] < data[minIndex]) {
-					minIndex = j;
-				}
-			}
-			swap(data[i], data[minIndex]);
-		}
-	}
 };
 
-// 辅助函数：打印 vector
 template<typename T>
 void printVector(const vector<T>& data) {
     for (const auto& elem : data) {
@@ -127,82 +104,128 @@ void printVector(const vector<T>& data) {
     cout << endl;
 }
 
-// 新增的演示函数，用于封装排序和输出过程
+
+// --- 新增的函数：生成随机数据的 Vector ---
 template<typename T>
-void demonstrateSorting(vector<T>& data, typename SortingMachine<T>::SortType sortType, const string& description) {
+vector<T> generateRandomVector(size_t length, double max_number) {
+    vector<T> data;
+    if (length == 0) {
+        return data; // 返回空 vector
+    }
+
+    data.reserve(length); // 预留内存以提高效率
+
+    // 使用当前时间作为种子
+    unsigned seed = chrono::steady_clock::now().time_since_epoch().count();
+    default_random_engine rng(seed); // 随机数引擎
+
+    // 根据数据类型选择合适的分布
+    if constexpr (is_integral_v<T>) { // 如果 T 是整数类型 (int, long, short, char 等)
+        // 确保 max_number 是非负的，并且转换为 T 类型
+        T max_val = static_cast<T>(max(0.0, max_number));
+        // 均匀分布在 [0, max_val] 范围内
+        uniform_int_distribution<T> dist(0, max_val);
+
+        for (size_t i = 0; i < length; ++i) {
+            data.push_back(dist(rng));
+        }
+
+    }
+    else if constexpr (is_floating_point_v<T>) { // 如果 T 是浮点类型 (float, double, long double)
+        // 确保 max_number 是非负的
+        double max_val = max(0.0, max_number);
+        // 均匀分布在 [0.0, max_val] 范围内
+        uniform_real_distribution<T> dist(0.0, static_cast<T>(max_val));
+
+        for (size_t i = 0; i < length; ++i) {
+            data.push_back(dist(rng));
+        }
+
+    }
+    else {
+        // 如果 T 是不支持随机生成的其他类型，可以抛出异常或打印错误
+        cerr << "Error: Data type not supported for random generation." << endl;
+        // return data; // 返回空 vector 或
+        // throw runtime_error("Unsupported data type for random generation");
+    }
+
+    return data;
+}
+
+// 新增的演示函数，用于封装数据生成、排序和输出过程
+template<typename T>
+void fullSortingDemo(typename SortingMachine<T>::SortType sortType, size_t length, double max_number, const string& description) {
     cout << "--- " << description << " ---" << endl;
 
-    // 1. 输入 / 准备
+    // 1. 输入 / 数据生成
+    cout << "Generating vector with length " << length << " and max value " << max_number << "..." << endl;
+    vector<T> data = generateRandomVector<T>(length, max_number); // 调用生成函数
+
+    // 确保数据已生成且不为空（除非 length == 0）
+    if (length > 0 && data.empty()) {
+        cerr << "Error: Failed to generate data." << endl;
+        return;
+    }
+    if (length == 0) {
+        cout << "Generated empty vector." << endl;
+    }
+
+
     cout << "Original vector: ";
     printVector(data);
 
     // 2. 初始化 SortingMachine 并调用排序
-    // (初始化 SortingMachine 和调用 sort 可以看作是这里的“调用函数”步骤的内部实现)
-    SortingMachine<T> sorter(sortType); // 初始化 SortingMachine，指定排序类型
-    sorter.sort(data);                  // 调用 sort 方法
+    SortingMachine<T> sorter(sortType);
 
-    // 3. 输出
+    // --- 设置开始时间戳 ---
+    auto start_time = chrono::steady_clock::now();
+
+    // --- 调用需要测量时长的代码块 ---
+    sorter.sort(data); // 排序是原地进行的，data 会被修改
+
+    // --- 设置结束时间戳 ---
+    auto end_time = chrono::steady_clock::now();
+
+    // --- 计算时长并转换为毫秒 ---
+    auto duration = end_time - start_time;
+    auto duration_ms = chrono::duration_cast<chrono::milliseconds>(duration);
+
+
+    // 3. 输出结果
     cout << "Sorted vector: ";
     printVector(data);
     cout << "Sort count for this demonstration: " << sorter.getSortCount() << endl;
+    cout << "Sorting took: " << duration_ms.count() << " milliseconds." << endl;
     cout << "\n"; // 添加空行以便区分不同的演示
 }
 
 
 // --- 示例用法 (main 函数变得更简洁) ---
 int main() {
-    // 定义需要排序的数据
-    vector<int> numbers1 = { 5, 2, 8, 1, 9, 4, 7, 3, 6 };
-    vector<int> numbers2 = { 10, 0, 5, -3, 12 };
-    vector<double> numbers3 = { 3.14, 1.618, 2.718, 0.577 };
+    // 使用 fullSortingDemo 来进行各种演示
 
-    // 1. & 2. 初始化 & 输入数据 (已在上面定义) + 3. 调用演示函数 & 4. 输出结果
-    demonstrateSorting(numbers1, SortingMachine<int>::BUBBLE_SORT, "Bubble Sort Demonstration (int)");
-    demonstrateSorting(numbers2, SortingMachine<int>::INSERTION_SORT, "Insertion Sort Demonstration (int)");
-    demonstrateSorting(numbers3, SortingMachine<double>::INSERTION_SORT, "Insertion Sort Demonstration (double)"); // 演示对 double 类型排序
-	demonstrateSorting(numbers1, SortingMachine<int>::SELECTION_SORT, "Selection Sort Demonstration (int)"); // 演示对 int 类型的选择排序
+    // 演示冒泡排序，生成 10000 个 int 类型随机数，上限 10000
+    fullSortingDemo<int>(SortingMachine<int>::BUBBLE_SORT, 10000, 10000, "Bubble Sort (int, 10000 elements, max 10000)");
 
-    // 注意：每次调用 demonstrateSorting 都会创建一个新的 SortingMachine 对象，
-    // 所以每次的 sort count 都是从 0 开始计算的（只计算在该演示函数中调用 sort 的次数）。
-    // 如果你想统计总的排序次数，需要在 main 函数中创建一个 SortingMachine 对象，并多次调用其 sort 方法。
+    cout << "--------------------" << endl;
 
-    cout << "--- Demonstrating cumulative sort count ---" << endl;
-    vector<int> numbers_cumulative = { 100, 50, 75, 25 };
+    // 演示插入排序，生成 10000 个 int 类型随机数，上限 10000
+    fullSortingDemo<int>(SortingMachine<int>::INSERTION_SORT, 10000, 10000, "Insertion Sort (int, 10000 elements, max 10000)");
 
-	auto start_time = chrono::steady_clock::now(); // 记录开始时间
-    SortingMachine<int> cumulativeSorter(SortingMachine<int>::BUBBLE_SORT); // 创建一个对象用于多次排序
-	auto duration_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count(); // 计算时间差
-    cout << "Original vector for cumulative sort: ";
-    printVector(numbers_cumulative);
-    cumulativeSorter.sort(numbers_cumulative);
-    cout << "Sorted vector: ";
-    printVector(numbers_cumulative);
-    cout << "Cumulative sort count: " << cumulativeSorter.getSortCount() << endl;
-	cout << "Time taken for sorting: " << duration_ms << " ms" << endl; // 输出时间差
+    cout << "--------------------" << endl;
 
-    vector<int> another_vector = { 1, 2, 3, 4, 5 };
-    cout << "\nOriginal vector for cumulative sort (second call): ";
-    printVector(another_vector);
-	start_time = chrono::steady_clock::now(); // 记录开始时间
-    cumulativeSorter.setSortingType(SortingMachine<int>::INSERTION_SORT); // 改变排序方法
-    cumulativeSorter.sort(another_vector);
-	duration_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count(); // 计算时间差
-    cout << "Sorted vector: ";
-    printVector(another_vector);
-    cout << "Cumulative sort count (after second call): " << cumulativeSorter.getSortCount() << endl; // 累加的次数
-	cout << "Time taken for sorting: " << duration_ms << " ms" << endl; // 输出时间差
+    // 演示插入排序，生成 5000 个 double 类型随机数，上限 1000.5
+    fullSortingDemo<double>(SortingMachine<double>::INSERTION_SORT, 5000, 1000.5, "Insertion Sort (double, 5000 elements, max 1000.5)");
 
-    vector<int> still_another_vector = {520, 330, 327, 545, 258};
-	cout << "\nOriginal vector for cumulative sort (third call): ";
-	printVector(still_another_vector);
-	start_time = chrono::steady_clock::now(); // 记录开始时间
-	cumulativeSorter.setSortingType(SortingMachine<int>::SELECTION_SORT); // 改变排序方法
-	cumulativeSorter.sort(still_another_vector);
-	duration_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count(); // 计算时间差
-	cout << "Sorted vector: ";
-	printVector(still_another_vector);
-	cout << "Cumulative sort count (after third call): " << cumulativeSorter.getSortCount() << endl; // 累加的次数
-	cout << "Time taken for sorting: " << duration_ms << " ms" << endl; // 输出时间差
+    cout << "--------------------" << endl;
+
+    // 演示冒泡排序对少量 float 数据
+    fullSortingDemo<float>(SortingMachine<float>::BUBBLE_SORT, 50, 100.0, "Bubble Sort (float, 50 elements, max 100)");
+
+    cout << "--------------------" << endl;
+
+    // 演示生成空 vector
+    fullSortingDemo<int>(SortingMachine<int>::BUBBLE_SORT, 0, 100, "Bubble Sort (int, 0 elements)");
 
 
     return 0;

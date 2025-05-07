@@ -38,7 +38,7 @@ static string get_composite_number_devisor_list(int input_number)    // Form a s
 		
 	}
 }
-
+/*
 int main()
 {
 	cin >> console_input;
@@ -46,3 +46,5 @@ int main()
 
 	return 0;
 }
+
+*/
